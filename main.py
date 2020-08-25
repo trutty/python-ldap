@@ -37,7 +37,7 @@ def login(username, password):
 
     # Get lookup key for config
     config_key = request.headers['Ldap-Config-Key']
-    cache_key = config_key + "#" + config_key
+    cache_key = username + "#" + config_key
     # Check if cached with same password
     if cache.validate(cache_key, password):
         logging.info("Successful cache hit for '%s'", cache_key)
