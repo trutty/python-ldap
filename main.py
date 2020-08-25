@@ -31,23 +31,24 @@ authHandler = AuthHandler(
 
 @auth.verify_password
 def login(username, password):
-
     # Check if username or password is empty
     if not username or not password:
         return False
 
-    # Check if username is cached and has same password
-    if cache.validate(username, password):
-        logging.info("Successful cache hit for '%s'", username)
+    # Get lookup key for config
+    config_key = request.headers['Ldap-Config-Key']
+    cache_key = config_key + "#" + config_key
+    # Check if cached with same password
+    if cache.validate(cache_key, password):
+        logging.info("Successful cache hit for '%s'", cache_key)
         return True
 
-    # Get headers from request
-    searchBase = request.headers['Ldap-User-BaseDN']
-    requiredGroup = request.headers['Ldap-Required-Group']
-    # The username and password are from the Basic Authentication pop-up form
-    if authHandler.validate(username, password, searchBase, requiredGroup):
-        # Include the user in the cache
-        cache.add(username, password)
+    # Lookup LDAP config
+    ldapParameters = config[config_key]
+    # Validate user
+    if authHandler.validate(username, password, ldapParameters):
+        # Add successful authentication to cache
+        cache.add(cache_key, password)
         return True
 
     return False
