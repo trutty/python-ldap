@@ -5,6 +5,7 @@ Implementation of basic LDAP authorization service for use within kubernetes and
 ## Deployment
 
 ````
+---
 apiVersion: v1
 kind: Secret
 metadata:
@@ -25,6 +26,27 @@ data:
     ldapServers:
     - ldap://<host>:<port>
     - ldaps://<host>:<port>
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/auth-snippet: |
+      proxy_set_header Ldap-User-BaseDN "ou=...,o=...,c=..."; 
+      proxy_set_header Ldap-Required-Group "cn=...,ou=...,o=...,c=..."";
+    nginx.ingress.kubernetes.io/auth-url: http://ldap-auth-adapter.ingress-nginx.svc.cluster.local
+  name: prometheus-louketo-proxy
+  namespace: monitoring
+spec:
+  rules:
+  - host: <target-host>
+    http:
+      paths:
+      - backend:
+          serviceName: <ldap-protected-target-service>
+          servicePort: <port>
+        path: /
+        pathType: ImplementationSpecific
 ---
 apiVersion: apps/v1
 kind: Deployment
