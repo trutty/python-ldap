@@ -26,16 +26,20 @@ data:
     ldapServers:
     - ldap://<host>:<port>
     - ldaps://<host>:<port>
+    my-config-key:
+    - searchBase: ou=,base-1,c=...,...
+      requiredGroup: cn=...,ou=...,...
+    - searchBase: ou=,base-2,c=...,...
+      requiredGroup: cn=...,ou=...,...
 ---
 apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
   annotations:
     nginx.ingress.kubernetes.io/auth-snippet: |
-      proxy_set_header Ldap-User-BaseDN "ou=...,o=...,c=..."; 
-      proxy_set_header Ldap-Required-Group "cn=...,ou=...,o=...,c=..."";
+      proxy_set_header Ldap-Config-Key my-config-key; 
     nginx.ingress.kubernetes.io/auth-url: http://ldap-auth-adapter.ingress-nginx.svc.cluster.local
-  name: prometheus-louketo-proxy
+  name: proxy-ingress
   namespace: monitoring
 spec:
   rules:
