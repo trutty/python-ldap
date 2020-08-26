@@ -35,7 +35,7 @@ class AuthHandler:
             logging.error("Error while trying to lookup user. %s", e)
             return None
 
-        logging.info("User '%s' not found")
+        logging.info("User '%s' not found", username)
         return None
 
     def validate_user_credentials(self, user_dn, password):
