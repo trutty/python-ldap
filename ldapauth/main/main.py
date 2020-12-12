@@ -1,5 +1,4 @@
-from flask import Flask
-from flask import request
+from flask import Flask, request
 from flask_httpauth import HTTPBasicAuth
 from auth_handler import AuthHandler
 from cache import Cache
@@ -7,15 +6,18 @@ from os import environ
 from yaml import safe_load
 import logging
 
-logging.basicConfig(format='%(asctime)s %(process)d %(levelname)s %(message)s', level=logging.DEBUG)
+from connection_provider import ConnectionProvider
+
+# init logging
+logging.basicConfig(format='[%(asctime)s] [%(levelname)s] %(message)s', level=logging.DEBUG)
 
 # Init flask app
 app = Flask(__name__)
 auth = HTTPBasicAuth()
 
-# Connect to memcached
-CACHE_EXPIRATION = 10  # Expiration in minutes
-cache = Cache(CACHE_EXPIRATION)
+# Basic cache
+CACHE_KEY_EXPIRATION_SECONDS = 60 * 60 * 8  # 8 hours
+cache = Cache(CACHE_KEY_EXPIRATION_SECONDS)
 
 # Init LDAP config
 with open("/config/config.yaml", 'r') as stream:
@@ -23,9 +25,9 @@ with open("/config/config.yaml", 'r') as stream:
 
 # Create the AuthHandler instance
 authHandler = AuthHandler(
-    config['ldapServers'],
     environ['LDAP_MANAGER_BINDDN'],
     environ["LDAP_MANAGER_PASSWORD"],
+    ConnectionProvider(config['ldapServers'])
 )
 
 
@@ -36,32 +38,39 @@ def login(username, password):
         return False
 
     # Get lookup key for config
-    config_key = request.headers['Ldap-Config-Key']
-    cache_key = username + "#" + config_key
-    # Check if cached with same password
-    if cache.validate(cache_key, password):
-        logging.info("Successful cache hit for '%s'", cache_key)
+    ldap_config_key = request.headers['Ldap-Config-Key']
+    # Check if authentication was cached
+    if cache.validate(username, ldap_config_key, password):
+        logging.info("[user=%s, config=%s] authenticated from cache", username, ldap_config_key)
         return True
 
     # Lookup LDAP config
-    ldapParameters = config[config_key]
+    ldapParameters = config[ldap_config_key]
     # Validate user
-    if authHandler.validate(username, password, ldapParameters):
+    if authHandler.validate(username, password, ldap_config_key, ldapParameters):
         # Add successful authentication to cache
-        cache.add(cache_key, password)
+        cache.set(username, ldap_config_key, password)
         return True
 
     return False
 
 
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
+@app.route('/')
 @auth.login_required
-def index(path):
+def index():
     code = 200
     msg = "LDAP Authentication"
     headers = []
     return msg, code, headers
+
+
+# health endpoint
+@app.route('/health')
+def health():
+    if cache is None or authHandler is None:
+        return "not healthy", 503
+    else:
+        return "healthy", 200
 
 
 # Main
