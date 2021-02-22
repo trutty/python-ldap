@@ -20,10 +20,12 @@ CACHE_KEY_EXPIRATION_SECONDS = 60 * 60 * 8  # 8 hours
 cache = Cache(CACHE_KEY_EXPIRATION_SECONDS)
 
 # Init LDAP config
+logging.info("Reading config.yaml")
 with open("/config/config.yaml", 'r') as stream:
     config = safe_load(stream)
 
 # Create the AuthHandler instance
+logging.info("Initializing authentication handler")
 authHandler = AuthHandler(
     environ['LDAP_MANAGER_BINDDN'],
     environ["LDAP_MANAGER_PASSWORD"],
@@ -55,9 +57,10 @@ def login(username, password):
     return False
 
 
-@app.route('/')
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
 @auth.login_required
-def index():
+def index(path):
     code = 200
     msg = "LDAP Authentication"
     headers = []
@@ -65,8 +68,8 @@ def index():
 
 
 # health endpoint
-@app.route('/health')
-def health():
+@app.route('/healthz')
+def healthz():
     if cache is None or authHandler is None:
         return "not healthy", 503
     else:
@@ -75,4 +78,4 @@ def health():
 
 # Main
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=9000, debug=False)
+    app.run(host='0.0.0.0', port=9000, debug=True)
